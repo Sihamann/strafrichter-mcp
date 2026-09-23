@@ -445,6 +445,92 @@ async function fetchRisDecisionHtml(
 }
 
 
+function cleanBurhoffDecisionText(
+  value: string,
+): string {
+  let text =
+    cleanText(value)
+
+  text =
+    text.replace(
+      /^Diese Homepage verwendet Cookies[\s\S]*?Datenschutzerklärung\s*/i,
+      "",
+    )
+
+  text =
+    text.replace(
+      /^Entscheidungen\s+/i,
+      "",
+    )
+
+  return text.trim()
+}
+
+
+function cleanBurhoffFileNumber(
+  value: string,
+): string {
+  return value
+    .replace(
+      /\s+Eigener Leitsatz\s*$/i,
+      "",
+    )
+    .trim()
+}
+
+
+function cleanBurhoffCitation(
+  value: string,
+): string {
+  return value
+    .replace(
+      /\s+Eigener Leitsatz\s*$/i,
+      "",
+    )
+    .trim()
+}
+
+
+async function getBurhoffDocumentClean(
+  url: string,
+  maxCharacters: number,
+) {
+  const data =
+    await getJson(
+      BURHOFF_BASE,
+      "/document",
+      {
+        url,
+        maxCharacters,
+      },
+    )
+
+  return {
+    ...data,
+    citation:
+      typeof data?.citation === "string"
+        ? cleanBurhoffCitation(
+            data.citation,
+          )
+        : data?.citation,
+    fileNumber:
+      typeof data?.fileNumber === "string"
+        ? cleanBurhoffFileNumber(
+            data.fileNumber,
+          )
+        : data?.fileNumber,
+    text:
+      typeof data?.text === "string"
+        ? cleanBurhoffDecisionText(
+            data.text,
+          )
+        : data?.text,
+    sourceStatus:
+      "Private juristische Recherchequelle",
+  }
+}
+
+
 // ======================================================
 // BURHOFF BLOG
 // ======================================================
@@ -639,13 +725,9 @@ async function getBurhoffBlogArticle(
   const dom =
     parseHtml(html)
 
-  dom
-    .querySelectorAll(
-      "script,style,nav,footer,form,aside,.comments-area,.sharedaddy,.jp-relatedposts",
-    )
-    .forEach(
-      (node: any) =>
-        node.remove(),
+  const metadataText =
+    cleanText(
+      dom.body?.textContent ?? "",
     )
 
   const article =
@@ -670,8 +752,64 @@ async function getBurhoffBlogArticle(
       "",
     )
 
-  const time =
-    article.querySelector("time")
+  const timeNode =
+    article.querySelector(
+      "time.entry-date, time.published, time",
+    ) ??
+    dom.querySelector(
+      "time.entry-date, time.published, time",
+    )
+
+  let date =
+    timeNode?.getAttribute(
+      "datetime",
+    ) ??
+    cleanText(
+      timeNode?.textContent ?? "",
+    )
+
+  const authorNode =
+    article.querySelector(
+      ".entry-meta .author a, .author.vcard a, .byline .author a, .author a, .byline",
+    ) ??
+    dom.querySelector(
+      ".entry-meta .author a, .author.vcard a, .byline .author a, .author a, .byline",
+    )
+
+  let author =
+    cleanText(
+      authorNode?.textContent ?? "",
+    )
+
+  const publishedMatch =
+    metadataText.match(
+      /Dieser Beitrag wurde am\s+(.+?)\s+von\s+(.+?)\s+unter\b/i,
+    )
+
+  if (
+    !date &&
+    publishedMatch?.[1]
+  ) {
+    date =
+      publishedMatch[1].trim()
+  }
+
+  if (
+    !author &&
+    publishedMatch?.[2]
+  ) {
+    author =
+      publishedMatch[2].trim()
+  }
+
+  dom
+    .querySelectorAll(
+      "script,style,nav,footer,form,aside,.comments-area,.sharedaddy,.jp-relatedposts,.post-navigation,.navigation",
+    )
+    .forEach(
+      (node: any) =>
+        node.remove(),
+    )
 
   const content =
     article.querySelector(
@@ -688,20 +826,8 @@ async function getBurhoffBlogArticle(
     ok: true,
     url,
     title,
-    date:
-      time?.getAttribute("datetime") ??
-      cleanText(
-        time?.textContent ?? "",
-      ),
-    author:
-      cleanText(
-        article
-          .querySelector(
-            ".author, .byline",
-          )
-          ?.textContent ??
-        "",
-      ),
+    date,
+    author,
     text:
       fullText.length > maxCharacters
         ? fullText.slice(0, maxCharacters)
@@ -733,7 +859,7 @@ const handler =
             name:
               "strafrichter-mcp",
             version:
-              "0.4.0",
+              "0.5.0",
           },
           {
             instructions: `
@@ -1209,13 +1335,9 @@ Alle Tools sind ausschließlich lesend.
         }) => {
           try {
             return toolResult(
-              await getJson(
-                BURHOFF_BASE,
-                "/document",
-                {
-                  url,
-                  maxCharacters,
-                },
+              await getBurhoffDocumentClean(
+                url,
+                maxCharacters,
               ),
             )
           } catch (error) {
