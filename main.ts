@@ -11,59 +11,44 @@ import {
 
 
 const HRR_BASE = "https://007.sihamann.deno.net"
-const BVERFG_BASE = "https://deno10.sihamann.deno.net"
+const RIS_BASE = "https://testphase.rechtsinformationen.bund.de"
 const BURHOFF_BASE = "https://009.sihamann.deno.net"
 const BURHOFF_BLOG_BASE = "https://blog.burhoff.de"
 
 
-function buildUrl(base: string, path: string): URL {
-  const normalizedBase =
-    base.endsWith("/") ? base : `${base}/`
-
-  const normalizedPath =
-    path.replace(/^\/+/, "")
-
-  return new URL(normalizedPath, normalizedBase)
+function buildUrl(
+  base: string,
+  path: string,
+): URL {
+  return new URL(
+    path.replace(/^\/+/, ""),
+    base.endsWith("/") ? base : `${base}/`,
+  )
 }
 
 
 async function getJson(
   base: string,
   path: string,
-  params: Record<
-    string,
-    string | number | boolean | undefined
-  > = {},
+  params: Record<string, string | number | boolean | undefined> = {},
 ): Promise<any> {
   const url = buildUrl(base, path)
 
-  for (
-    const [key, value]
-    of Object.entries(params)
-  ) {
+  for (const [key, value] of Object.entries(params)) {
     if (value !== undefined) {
-      url.searchParams.set(
-        key,
-        String(value),
-      )
+      url.searchParams.set(key, String(value))
     }
   }
 
-  const response =
-    await fetch(
-      url,
-      {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-        },
-        signal:
-          AbortSignal.timeout(30000),
-      },
-    )
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+    },
+    signal: AbortSignal.timeout(30000),
+  })
 
-  const text =
-    await response.text()
+  const text = await response.text()
 
   let data: any
 
@@ -71,8 +56,7 @@ async function getJson(
     data = JSON.parse(text)
   } catch {
     throw new Error(
-      `Ungültige JSON-Antwort von ${url.toString()}: ` +
-      text.slice(0, 1500),
+      `Ungültige JSON-Antwort von ${url.toString()}: ${text.slice(0, 1500)}`,
     )
   }
 
@@ -85,8 +69,7 @@ async function getJson(
           : JSON.stringify(data)
 
     throw new Error(
-      `HTTP ${response.status} von ${url.toString()}: ` +
-      String(detail).slice(0, 1800),
+      `HTTP ${response.status} von ${url.toString()}: ${String(detail).slice(0, 1800)}`,
     )
   }
 
@@ -94,35 +77,57 @@ async function getJson(
 }
 
 
-function toolResult(data: unknown) {
+async function getText(
+  url: string,
+  accept = "text/html,application/xhtml+xml",
+): Promise<string> {
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Accept: accept,
+      "User-Agent": "Strafrichter-MCP/1.0",
+    },
+    signal: AbortSignal.timeout(30000),
+  })
+
+  const text = await response.text()
+
+  if (!response.ok) {
+    throw new Error(
+      `HTTP ${response.status} von ${url}: ${text.slice(0, 1200)}`,
+    )
+  }
+
+  return text
+}
+
+
+function toolResult(
+  data: unknown,
+) {
   return {
     content: [
       {
         type: "text" as const,
-        text:
-          JSON.stringify(
-            data,
-            null,
-            2,
-          ),
+        text: JSON.stringify(data, null, 2),
       },
     ],
   }
 }
 
 
-function toolError(error: unknown) {
-  const message =
-    error instanceof Error
-      ? error.message
-      : String(error)
-
+function toolError(
+  error: unknown,
+) {
   return {
     content: [
       {
         type: "text" as const,
-        text:
-          `Fehler: ${message}`,
+        text: `Fehler: ${
+          error instanceof Error
+            ? error.message
+            : String(error)
+        }`,
       },
     ],
     isError: true,
@@ -130,7 +135,9 @@ function toolError(error: unknown) {
 }
 
 
-function cleanText(value: string): string {
+function cleanText(
+  value: string,
+): string {
   return value
     .replace(/\u00a0/g, " ")
     .replace(/[ \t]+/g, " ")
@@ -139,6 +146,308 @@ function cleanText(value: string): string {
     .trim()
 }
 
+
+function parseHtml(
+  html: string,
+) {
+  const dom = new DOMParser().parseFromString(
+    html,
+    "text/html",
+  )
+
+  if (!dom) {
+    throw new Error(
+      "HTML konnte nicht geparst werden.",
+    )
+  }
+
+  return dom
+}
+
+
+// ======================================================
+// RIS / BVERFG
+// ======================================================
+
+function stripMarkTags(
+  value: string,
+): string {
+  return value
+    .replace(/<\/?mark>/gi, "")
+    .trim()
+}
+
+
+function extractRisDecision(
+  entry: any,
+) {
+  const item = entry?.item ?? entry
+
+  const matches =
+    Array.isArray(entry?.textMatches)
+      ? entry.textMatches
+      : []
+
+  const snippet =
+    matches
+      .map(
+        (match: any) =>
+          stripMarkTags(
+            String(match?.text ?? ""),
+          ),
+      )
+      .filter(Boolean)
+      .join("\n\n")
+      .slice(0, 3000)
+
+  const documentNumber =
+    String(item?.documentNumber ?? "")
+
+  return {
+    documentNumber,
+    ecli:
+      item?.ecli ?? null,
+    headline:
+      item?.headline ?? null,
+    titleLine:
+      item?.titleLine ?? null,
+    date:
+      item?.decisionDate ?? null,
+    fileNumbers:
+      Array.isArray(item?.fileNumbers)
+        ? item.fileNumbers
+        : [],
+    court:
+      item?.courtName ??
+      item?.courtType ??
+      null,
+    decisionType:
+      item?.documentType ?? null,
+    judicialBody:
+      item?.judicialBody ?? null,
+    location:
+      item?.location ?? null,
+    snippet,
+    htmlPath:
+      documentNumber
+        ? `/v1/case-law/${encodeURIComponent(documentNumber)}.html`
+        : null,
+    xmlPath:
+      documentNumber
+        ? `/v1/case-law/${encodeURIComponent(documentNumber)}.xml`
+        : null,
+    source:
+      "Rechtsinformationen des Bundes",
+    sourceStatus:
+      "Amtliche Primärquelle",
+  }
+}
+
+
+async function searchBverfgRis(
+  query: string | undefined,
+  aktenzeichen: string | undefined,
+  maxPages: number,
+  fromDate: string | undefined,
+  toDate: string | undefined,
+) {
+  const results: any[] = []
+  const pageSize = 25
+
+  let pageIndex = 0
+  let pagesFetched = 0
+  let totalItems: number | null = null
+  let hasMore = false
+
+  while (pageIndex < maxPages) {
+    const data = await getJson(
+      RIS_BASE,
+      "/v1/case-law",
+      {
+        searchTerm:
+          query?.trim() || undefined,
+        fileNumber:
+          aktenzeichen?.trim() || undefined,
+        court:
+          "BVerfG",
+        dateFrom:
+          fromDate,
+        dateTo:
+          toDate,
+        size:
+          pageSize,
+        pageIndex,
+      },
+    )
+
+    pagesFetched++
+
+    if (
+      typeof data?.totalItems ===
+      "number"
+    ) {
+      totalItems = data.totalItems
+    }
+
+    const member =
+      Array.isArray(data?.member)
+        ? data.member
+        : []
+
+    for (const entry of member) {
+      results.push(
+        extractRisDecision(entry),
+      )
+    }
+
+    hasMore =
+      Boolean(data?.view?.next) ||
+      (
+        typeof totalItems === "number" &&
+        (pageIndex + 1) * pageSize < totalItems
+      )
+
+    if (!hasMore) {
+      break
+    }
+
+    pageIndex++
+  }
+
+  return {
+    ok: true,
+    query:
+      query ?? null,
+    aktenzeichen:
+      aktenzeichen ?? null,
+    court:
+      "BVerfG",
+    fromDate:
+      fromDate ?? null,
+    toDate:
+      toDate ?? null,
+    source:
+      RIS_BASE,
+    sourceStatus:
+      "Amtliche Primärquelle",
+    totalItems,
+    pagesFetched,
+    resultsCount:
+      results.length,
+    hasMore,
+    results,
+    note:
+      "Die Suche erfolgt direkt über die API Rechtsinformationen des Bundes. Für tragende Aussagen den Volltext mit get_bverfg_decision abrufen.",
+  }
+}
+
+
+function normalizeRisDocumentNumber(
+  value: string,
+): string {
+  const trimmed = value.trim()
+
+  if (
+    /^[A-Za-z0-9._-]+$/
+      .test(trimmed)
+  ) {
+    return trimmed
+  }
+
+  let pathname = ""
+
+  try {
+    pathname =
+      new URL(trimmed, RIS_BASE)
+        .pathname
+  } catch {
+    throw new Error(
+      "Ungültige documentNumber oder RIS-URL.",
+    )
+  }
+
+  const match =
+    pathname.match(
+      /\/v1\/case-law\/([^/]+?)(?:\.html|\.xml)?$/,
+    )
+
+  if (!match) {
+    throw new Error(
+      "Aus der angegebenen RIS-URL konnte keine documentNumber ermittelt werden.",
+    )
+  }
+
+  return decodeURIComponent(match[1])
+}
+
+
+async function fetchRisDecisionHtml(
+  documentNumberInput: string,
+  maxCharacters: number,
+) {
+  const documentNumber =
+    normalizeRisDocumentNumber(
+      documentNumberInput,
+    )
+
+  const url =
+    `${RIS_BASE}/v1/case-law/` +
+    `${encodeURIComponent(documentNumber)}.html`
+
+  const html =
+    await getText(url)
+
+  const dom =
+    parseHtml(html)
+
+  dom
+    .querySelectorAll(
+      "script,style,nav,footer,form,aside",
+    )
+    .forEach(
+      (node: any) =>
+        node.remove(),
+    )
+
+  const title =
+    cleanText(
+      dom.querySelector("title")
+        ?.textContent ??
+      dom.querySelector("h1")
+        ?.textContent ??
+      "",
+    )
+
+  const fullText =
+    cleanText(
+      dom.body?.textContent ??
+      "",
+    )
+
+  return {
+    ok: true,
+    documentNumber,
+    title,
+    url,
+    text:
+      fullText.length > maxCharacters
+        ? fullText.slice(0, maxCharacters)
+        : fullText,
+    totalCharacters:
+      fullText.length,
+    truncated:
+      fullText.length > maxCharacters,
+    source:
+      "Rechtsinformationen des Bundes",
+    sourceStatus:
+      "Amtliche Primärquelle",
+  }
+}
+
+
+// ======================================================
+// BURHOFF BLOG
+// ======================================================
 
 function absoluteBurhoffBlogUrl(
   value: string,
@@ -162,73 +471,19 @@ function absoluteBurhoffBlogUrl(
 }
 
 
-async function fetchHtml(
-  url: string,
-): Promise<string> {
-  const response =
-    await fetch(
-      url,
-      {
-        method: "GET",
-        headers: {
-          Accept:
-            "text/html,application/xhtml+xml",
-          "User-Agent":
-            "Strafrichter-MCP/1.0",
-        },
-        signal:
-          AbortSignal.timeout(30000),
-      },
-    )
-
-  const html =
-    await response.text()
-
-  if (!response.ok) {
-    throw new Error(
-      `HTTP ${response.status} von ${url}: ` +
-      html.slice(0, 1200),
-    )
-  }
-
-  return html
-}
-
-
-function parseHtml(html: string) {
-  const dom =
-    new DOMParser()
-      .parseFromString(
-        html,
-        "text/html",
-      )
-
-  if (!dom) {
-    throw new Error(
-      "HTML konnte nicht geparst werden.",
-    )
-  }
-
-  return dom
-}
-
-
 async function searchBurhoffBlog(
   query: string,
   maxPages: number,
   maxResults: number,
 ) {
   const results: any[] = []
-  const seen =
-    new Set<string>()
+  const seen = new Set<string>()
 
   let pagesFetched = 0
   let hasMore = false
   let page = 1
 
-  while (
-    page <= maxPages
-  ) {
+  while (page <= maxPages) {
     const url =
       new URL(
         page === 1
@@ -243,7 +498,7 @@ async function searchBurhoffBlog(
     )
 
     const html =
-      await fetchHtml(
+      await getText(
         url.toString(),
       )
 
@@ -259,20 +514,14 @@ async function searchBurhoffBlog(
         ),
       ) as any[]
 
-    for (
-      const article
-      of articles
-    ) {
+    for (const article of articles) {
       const titleLink =
         article.querySelector(
           ".entry-title a, h1 a, h2 a, h3 a",
         )
 
       const href =
-        titleLink
-          ?.getAttribute(
-            "href",
-          )
+        titleLink?.getAttribute("href")
 
       if (!href) {
         continue
@@ -282,95 +531,52 @@ async function searchBurhoffBlog(
 
       try {
         articleUrl =
-          absoluteBurhoffBlogUrl(
-            href,
-          )
+          absoluteBurhoffBlogUrl(href)
       } catch {
         continue
       }
 
-      if (
-        seen.has(
-          articleUrl,
-        )
-      ) {
+      if (seen.has(articleUrl)) {
         continue
       }
 
-      seen.add(
-        articleUrl,
-      )
-
-      const title =
-        cleanText(
-          titleLink
-            ?.textContent ??
-          "",
-        )
+      seen.add(articleUrl)
 
       const time =
-        article.querySelector(
-          "time",
-        )
-
-      const date =
-        time?.getAttribute(
-          "datetime",
-        ) ??
-        cleanText(
-          time?.textContent ??
-          "",
-        )
-
-      const author =
-        cleanText(
-          article
-            .querySelector(
-              ".author, .byline",
-            )
-            ?.textContent ??
-          "",
-        )
+        article.querySelector("time")
 
       const excerptNode =
         article.querySelector(
           ".entry-summary, .entry-content",
         )
 
-      const snippet =
-        cleanText(
-          excerptNode
-            ?.textContent ??
-          "",
-        )
-          .slice(
-            0,
-            1200,
-          )
-
-      const categories =
-        Array.from(
-          article.querySelectorAll(
-            ".cat-links a, .category a",
-          ),
-        )
-          .map(
-            (node: any) =>
-              cleanText(
-                node.textContent ??
-                "",
-              ),
-          )
-          .filter(Boolean)
-
       results.push({
-        title,
+        title:
+          cleanText(
+            titleLink?.textContent ?? "",
+          ),
         url:
           articleUrl,
-        date,
-        author,
-        categories,
-        snippet,
+        date:
+          time?.getAttribute("datetime") ??
+          cleanText(
+            time?.textContent ?? "",
+          ),
+        author:
+          cleanText(
+            article
+              .querySelector(
+                ".author, .byline",
+              )
+              ?.textContent ??
+            "",
+          ),
+        snippet:
+          cleanText(
+            excerptNode?.textContent ??
+            "",
+          )
+            .slice(0, 1200),
         source:
           "Burhoff online Blog",
         sourceStatus:
@@ -393,13 +599,9 @@ async function searchBurhoffBlog(
       )
 
     if (
-      results.length >=
-      maxResults
+      results.length >= maxResults ||
+      !hasMore
     ) {
-      break
-    }
-
-    if (!hasMore) {
       break
     }
 
@@ -432,7 +634,7 @@ async function getBurhoffBlogArticle(
     )
 
   const html =
-    await fetchHtml(url)
+    await getText(url)
 
   const dom =
     parseHtml(html)
@@ -447,9 +649,7 @@ async function getBurhoffBlogArticle(
     )
 
   const article =
-    dom.querySelector(
-      "article",
-    ) ??
+    dom.querySelector("article") ??
     dom.body
 
   if (!article) {
@@ -465,66 +665,13 @@ async function getBurhoffBlogArticle(
           ".entry-title, h1",
         )
         ?.textContent ??
-      dom.querySelector(
-        "title",
-      )
+      dom.querySelector("title")
         ?.textContent ??
       "",
     )
 
   const time =
-    article.querySelector(
-      "time",
-    )
-
-  const date =
-    time?.getAttribute(
-      "datetime",
-    ) ??
-    cleanText(
-      time?.textContent ??
-      "",
-    )
-
-  const author =
-    cleanText(
-      article
-        .querySelector(
-          ".author, .byline",
-        )
-        ?.textContent ??
-      "",
-    )
-
-  const categories =
-    Array.from(
-      article.querySelectorAll(
-        ".cat-links a, .category a",
-      ),
-    )
-      .map(
-        (node: any) =>
-          cleanText(
-            node.textContent ??
-            "",
-          ),
-      )
-      .filter(Boolean)
-
-  const tags =
-    Array.from(
-      article.querySelectorAll(
-        ".tags-links a, .tag-links a",
-      ),
-    )
-      .map(
-        (node: any) =>
-          cleanText(
-            node.textContent ??
-            "",
-          ),
-      )
-      .filter(Boolean)
+    article.querySelector("time")
 
   const content =
     article.querySelector(
@@ -534,47 +681,48 @@ async function getBurhoffBlogArticle(
 
   const fullText =
     cleanText(
-      content.textContent ??
-      "",
+      content.textContent ?? "",
     )
-
-  const totalCharacters =
-    fullText.length
-
-  const returnedText =
-    totalCharacters >
-      maxCharacters
-      ? fullText.slice(
-          0,
-          maxCharacters,
-        )
-      : fullText
 
   return {
     ok: true,
     url,
     title,
-    date,
-    author,
-    categories,
-    tags,
+    date:
+      time?.getAttribute("datetime") ??
+      cleanText(
+        time?.textContent ?? "",
+      ),
+    author:
+      cleanText(
+        article
+          .querySelector(
+            ".author, .byline",
+          )
+          ?.textContent ??
+        "",
+      ),
     text:
-      returnedText,
-    totalCharacters,
+      fullText.length > maxCharacters
+        ? fullText.slice(0, maxCharacters)
+        : fullText,
+    totalCharacters:
+      fullText.length,
     truncated:
-      totalCharacters >
-      maxCharacters,
+      fullText.length > maxCharacters,
     source:
       "Burhoff online Blog",
     sourceStatus:
       "Sekundärquelle",
     warning:
-      "Der Burhoff-Blog ist eine private Sekundärquelle. " +
-      "Tragende Rechtsaussagen und wiedergegebene Gerichtsentscheidungen " +
-      "sind anhand von Gesetz und verifizierten Primärquellen gegenzuprüfen.",
+      "Der Burhoff-Blog ist eine private Sekundärquelle. Tragende Rechtsaussagen und zitierte Entscheidungen sind anhand von Gesetz und verifizierten Primärquellen gegenzuprüfen.",
   }
 }
 
+
+// ======================================================
+// MCP SERVER
+// ======================================================
 
 const handler =
   createMcpHandler(
@@ -585,7 +733,7 @@ const handler =
             name:
               "strafrichter-mcp",
             version:
-              "0.3.0",
+              "0.4.0",
           },
           {
             instructions: `
@@ -594,21 +742,15 @@ Strafrecht, Strafprozessrecht, Ordnungswidrigkeitenrecht und
 angrenzende Rechtsgebiete.
 
 HRR-Strafrecht ist eine fachwissenschaftliche Sekundärquelle.
-Tragende Rechtsaussagen sind anhand von Gesetz und belastbaren
-Primärquellen gegenzuprüfen.
 
-Der BVerfG-Deno-Proxy ist technischer Transport. Soweit der
-zurückgegebene Text von der amtlichen BVerfG-Seite stammt, ist
-die zugrunde liegende Entscheidung eine Primärquelle.
-Suchtreffer ersetzen keinen Volltextabruf.
+BVerfG-Entscheidungen werden direkt über die API
+Rechtsinformationen des Bundes recherchiert. Diese Quelle ist
+für die dort bereitgestellten amtlichen Entscheidungstexte als
+Primärquelle zu behandeln. Suchtreffer ersetzen keinen Volltextabruf.
 
 Burhoff-Rechtsprechung ist eine private juristische Recherchequelle.
-Gerichtsentscheidungen sind soweit möglich anhand einer amtlichen
-oder anderweitig verifizierten Primärfundstelle gegenzuprüfen.
 
 Der Burhoff online Blog ist eine private fachliche Sekundärquelle.
-Blogbeiträge dürfen zur Recherche, Einordnung und zum Auffinden
-zitierter Entscheidungen genutzt werden.
 
 Upstream-Fehler dürfen nicht als leere Trefferliste interpretiert werden.
 Alle Tools sind ausschließlich lesend.
@@ -617,6 +759,7 @@ Alle Tools sind ausschließlich lesend.
         )
 
 
+      // 1
       server.registerTool(
         "health_hrr_strafrecht",
         {
@@ -645,6 +788,7 @@ Alle Tools sind ausschließlich lesend.
       )
 
 
+      // 2
       server.registerTool(
         "search_hrr_articles",
         {
@@ -704,6 +848,7 @@ Alle Tools sind ausschließlich lesend.
       )
 
 
+      // 3
       server.registerTool(
         "get_hrr_article",
         {
@@ -750,11 +895,12 @@ Alle Tools sind ausschließlich lesend.
       )
 
 
+      // 4
       server.registerTool(
         "health_bverfg",
         {
           description:
-            "Prüft, ob der BVerfG-Deno-Proxy erreichbar ist.",
+            "Prüft die BVerfG-Recherche über Rechtsinformationen des Bundes.",
           inputSchema:
             z.object({}),
           annotations: {
@@ -765,12 +911,33 @@ Alle Tools sind ausschließlich lesend.
         },
         async () => {
           try {
-            return toolResult(
+            const data =
               await getJson(
-                BVERFG_BASE,
-                "/health",
-              ),
-            )
+                RIS_BASE,
+                "/v1/case-law",
+                {
+                  court:
+                    "BVerfG",
+                  size:
+                    1,
+                  pageIndex:
+                    0,
+                },
+              )
+
+            return toolResult({
+              ok: true,
+              service:
+                "Rechtsinformationen des Bundes",
+              court:
+                "BVerfG",
+              totalItems:
+                data?.totalItems ?? null,
+              source:
+                RIS_BASE,
+              sourceStatus:
+                "Amtliche Primärquelle",
+            })
           } catch (error) {
             return toolError(error)
           }
@@ -778,11 +945,12 @@ Alle Tools sind ausschließlich lesend.
       )
 
 
+      // 5
       server.registerTool(
         "search_bverfg_decisions",
         {
           description:
-            "Sucht BVerfG-Entscheidungen. Relevante Treffer anschließend im Volltext abrufen.",
+            "Sucht BVerfG-Entscheidungen direkt über Rechtsinformationen des Bundes. Relevante Treffer anschließend im Volltext abrufen.",
           inputSchema:
             z.object({
               query:
@@ -840,16 +1008,12 @@ Alle Tools sind ausschließlich lesend.
         }) => {
           try {
             return toolResult(
-              await getJson(
-                BVERFG_BASE,
-                "/search",
-                {
-                  query,
-                  aktenzeichen,
-                  maxPages,
-                  fromDate,
-                  toDate,
-                },
+              await searchBverfgRis(
+                query,
+                aktenzeichen,
+                maxPages,
+                fromDate,
+                toDate,
               ),
             )
           } catch (error) {
@@ -859,17 +1023,18 @@ Alle Tools sind ausschließlich lesend.
       )
 
 
+      // 6
       server.registerTool(
         "get_bverfg_decision",
         {
           description:
-            "Ruft eine konkrete BVerfG-Entscheidung anhand der URL aus einem Suchtreffer ab.",
+            "Ruft den amtlichen Volltext einer BVerfG-Entscheidung aus Rechtsinformationen des Bundes ab. Erwartet die documentNumber aus einem Suchtreffer, z.B. KVRE427931801.",
           inputSchema:
             z.object({
-              url:
+              documentNumber:
                 z.string()
-                  .min(5)
-                  .max(3000),
+                  .min(3)
+                  .max(500),
               maxCharacters:
                 z.number()
                   .int()
@@ -884,18 +1049,14 @@ Alle Tools sind ausschließlich lesend.
           },
         },
         async ({
-          url,
+          documentNumber,
           maxCharacters,
         }) => {
           try {
             return toolResult(
-              await getJson(
-                BVERFG_BASE,
-                "/decision",
-                {
-                  url,
-                  maxCharacters,
-                },
+              await fetchRisDecisionHtml(
+                documentNumber,
+                maxCharacters,
               ),
             )
           } catch (error) {
@@ -905,6 +1066,7 @@ Alle Tools sind ausschließlich lesend.
       )
 
 
+      // 7
       server.registerTool(
         "health_burhoff",
         {
@@ -933,6 +1095,7 @@ Alle Tools sind ausschließlich lesend.
       )
 
 
+      // 8
       server.registerTool(
         "search_burhoff_decisions",
         {
@@ -1015,6 +1178,7 @@ Alle Tools sind ausschließlich lesend.
       )
 
 
+      // 9
       server.registerTool(
         "get_burhoff_document",
         {
@@ -1061,6 +1225,7 @@ Alle Tools sind ausschließlich lesend.
       )
 
 
+      // 10
       server.registerTool(
         "health_burhoff_blog",
         {
@@ -1077,7 +1242,7 @@ Alle Tools sind ausschließlich lesend.
         async () => {
           try {
             const html =
-              await fetchHtml(
+              await getText(
                 `${BURHOFF_BLOG_BASE}/`,
               )
 
@@ -1097,6 +1262,7 @@ Alle Tools sind ausschließlich lesend.
       )
 
 
+      // 11
       server.registerTool(
         "search_burhoff_blog",
         {
@@ -1147,6 +1313,7 @@ Alle Tools sind ausschließlich lesend.
       )
 
 
+      // 12
       server.registerTool(
         "get_burhoff_blog_article",
         {
