@@ -16,22 +16,14 @@ const BURHOFF_BASE = "https://009.sihamann.deno.net"
 const BURHOFF_BLOG_BASE = "https://blog.burhoff.de"
 
 
-function buildUrl(
-  base: string,
-  path: string,
-): URL {
+function buildUrl(base: string, path: string): URL {
   const normalizedBase =
-    base.endsWith("/")
-      ? base
-      : `${base}/`
+    base.endsWith("/") ? base : `${base}/`
 
   const normalizedPath =
     path.replace(/^\/+/, "")
 
-  return new URL(
-    normalizedPath,
-    normalizedBase,
-  )
+  return new URL(normalizedPath, normalizedBase)
 }
 
 
@@ -43,11 +35,7 @@ async function getJson(
     string | number | boolean | undefined
   > = {},
 ): Promise<any> {
-  const url =
-    buildUrl(
-      base,
-      path,
-    )
+  const url = buildUrl(base, path)
 
   for (
     const [key, value]
@@ -66,12 +54,9 @@ async function getJson(
       url,
       {
         method: "GET",
-
         headers: {
-          Accept:
-            "application/json",
+          Accept: "application/json",
         },
-
         signal:
           AbortSignal.timeout(30000),
       },
@@ -83,8 +68,7 @@ async function getJson(
   let data: any
 
   try {
-    data =
-      JSON.parse(text)
+    data = JSON.parse(text)
   } catch {
     throw new Error(
       `Ungültige JSON-Antwort von ${url.toString()}: ` +
@@ -110,9 +94,7 @@ async function getJson(
 }
 
 
-function toolResult(
-  data: unknown,
-) {
+function toolResult(data: unknown) {
   return {
     content: [
       {
@@ -129,9 +111,7 @@ function toolResult(
 }
 
 
-function toolError(
-  error: unknown,
-) {
+function toolError(error: unknown) {
   const message =
     error instanceof Error
       ? error.message
@@ -145,15 +125,12 @@ function toolError(
           `Fehler: ${message}`,
       },
     ],
-
     isError: true,
   }
 }
 
 
-function cleanText(
-  value: string,
-): string {
+function cleanText(value: string): string {
   return value
     .replace(/\u00a0/g, " ")
     .replace(/[ \t]+/g, " ")
@@ -193,15 +170,12 @@ async function fetchHtml(
       url,
       {
         method: "GET",
-
         headers: {
           Accept:
             "text/html,application/xhtml+xml",
-
           "User-Agent":
-            "Deutsche-Rechtsrecherche-MCP/1.0",
+            "Strafrichter-MCP/1.0",
         },
-
         signal:
           AbortSignal.timeout(30000),
       },
@@ -221,9 +195,7 @@ async function fetchHtml(
 }
 
 
-function parseHtml(
-  html: string,
-) {
+function parseHtml(html: string) {
   const dom =
     new DOMParser()
       .parseFromString(
@@ -247,18 +219,15 @@ async function searchBurhoffBlog(
   maxResults: number,
 ) {
   const results: any[] = []
-
   const seen =
     new Set<string>()
 
   let pagesFetched = 0
-
   let hasMore = false
+  let page = 1
 
-  for (
-    let page = 1;
-    page <= maxPages;
-    page++
+  while (
+    page <= maxPages
   ) {
     const url =
       new URL(
@@ -396,21 +365,14 @@ async function searchBurhoffBlog(
 
       results.push({
         title,
-
         url:
           articleUrl,
-
         date,
-
         author,
-
         categories,
-
         snippet,
-
         source:
           "Burhoff online Blog",
-
         sourceStatus:
           "Sekundärquelle",
       })
@@ -423,13 +385,12 @@ async function searchBurhoffBlog(
       }
     }
 
-    const next =
-      dom.querySelector(
-        ".nav-next a, a.next, .next.page-numbers",
-      )
-
     hasMore =
-      Boolean(next)
+      Boolean(
+        dom.querySelector(
+          ".nav-next a, a.next, .next.page-numbers",
+        ),
+      )
 
     if (
       results.length >=
@@ -441,26 +402,21 @@ async function searchBurhoffBlog(
     if (!hasMore) {
       break
     }
+
+    page++
   }
 
   return {
     ok: true,
-
     query,
-
     source:
-      "https://blog.burhoff.de/",
-
+      BURHOFF_BLOG_BASE,
     sourceStatus:
       "Sekundärquelle",
-
     pagesFetched,
-
     resultsCount:
       results.length,
-
     hasMore,
-
     results,
   }
 }
@@ -596,34 +552,22 @@ async function getBurhoffBlogArticle(
 
   return {
     ok: true,
-
     url,
-
     title,
-
     date,
-
     author,
-
     categories,
-
     tags,
-
     text:
       returnedText,
-
     totalCharacters,
-
     truncated:
       totalCharacters >
       maxCharacters,
-
     source:
       "Burhoff online Blog",
-
     sourceStatus:
       "Sekundärquelle",
-
     warning:
       "Der Burhoff-Blog ist eine private Sekundärquelle. " +
       "Tragende Rechtsaussagen und wiedergegebene Gerichtsentscheidungen " +
@@ -640,41 +584,33 @@ const handler =
           {
             name:
               "strafrichter-mcp",
-
             version:
-              "0.2.1",
+              "0.3.0",
           },
           {
             instructions: `
-Dieser MCP-Server bündelt mehrere lesende Recherchequellen für
-deutsches Strafrecht, Strafprozessrecht, Ordnungswidrigkeitenrecht
-und angrenzende Rechtsgebiete.
+Dieser MCP-Server bündelt lesende Recherchequellen für deutsches
+Strafrecht, Strafprozessrecht, Ordnungswidrigkeitenrecht und
+angrenzende Rechtsgebiete.
 
 HRR-Strafrecht ist eine fachwissenschaftliche Sekundärquelle.
-Beiträge dienen der Recherche, Einordnung und Argumentationskontrolle.
 Tragende Rechtsaussagen sind anhand von Gesetz und belastbaren
 Primärquellen gegenzuprüfen.
 
 Der BVerfG-Deno-Proxy ist technischer Transport. Soweit der
 zurückgegebene Text von der amtlichen BVerfG-Seite stammt, ist
 die zugrunde liegende Entscheidung eine Primärquelle.
-Bei tragender Verwendung sind Datum, Aktenzeichen,
-Entscheidungsart, ECLI und Volltext zu prüfen.
 Suchtreffer ersetzen keinen Volltextabruf.
 
 Burhoff-Rechtsprechung ist eine private juristische Recherchequelle.
-Burhoff-Treffer und dort bereitgestellte Texte sind nicht allein
-wegen ihrer Bereitstellung als amtliche Primärquelle zu behandeln.
 Gerichtsentscheidungen sind soweit möglich anhand einer amtlichen
 oder anderweitig verifizierten Primärfundstelle gegenzuprüfen.
 
 Der Burhoff online Blog ist eine private fachliche Sekundärquelle.
 Blogbeiträge dürfen zur Recherche, Einordnung und zum Auffinden
-zitierter Entscheidungen genutzt werden. Tragende Rechtsaussagen
-sind anhand von Gesetz und Primärquellen gegenzuprüfen.
+zitierter Entscheidungen genutzt werden.
 
 Upstream-Fehler dürfen nicht als leere Trefferliste interpretiert werden.
-
 Alle Tools sind ausschließlich lesend.
             `.trim(),
           },
@@ -685,18 +621,15 @@ Alle Tools sind ausschließlich lesend.
         "health_hrr_strafrecht",
         {
           description:
-            "Prüft, ob der bestehende HRR-Strafrecht-Deno-Proxy erreichbar ist.",
-
+            "Prüft, ob der HRR-Strafrecht-Deno-Proxy erreichbar ist.",
           inputSchema:
             z.object({}),
-
           annotations: {
             readOnlyHint: true,
             idempotentHint: true,
             openWorldHint: true,
           },
         },
-
         async () => {
           try {
             return toolResult(
@@ -715,34 +648,23 @@ Alle Tools sind ausschließlich lesend.
       server.registerTool(
         "search_hrr_articles",
         {
-          description: `
-Durchsucht das HRR-Strafrecht-Aufsatzarchiv.
-
-HRR-Strafrecht ist eine fachwissenschaftliche Sekundärquelle.
-totalFound bezeichnet die von HRR gemeldete Trefferzahl vor
-einem lokalen Rezensionenfilter.
-resultsCount zählt die tatsächlich gelieferten Treffer.
-hasMore=true bedeutet, dass weitere Ergebnisseiten vorhanden sind.
-          `.trim(),
-
+          description:
+            "Durchsucht das HRR-Strafrecht-Aufsatzarchiv. HRR ist eine Sekundärquelle.",
           inputSchema:
             z.object({
               query:
                 z.string()
                   .min(2)
                   .max(500),
-
               includeReviews:
                 z.boolean()
                   .default(false),
-
               mode:
                 z.enum([
                   "standard",
                   "exact",
                 ])
                   .default("standard"),
-
               maxPages:
                 z.number()
                   .int()
@@ -750,14 +672,12 @@ hasMore=true bedeutet, dass weitere Ergebnisseiten vorhanden sind.
                   .max(5)
                   .default(2),
             }),
-
           annotations: {
             readOnlyHint: true,
             idempotentHint: true,
             openWorldHint: true,
           },
         },
-
         async ({
           query,
           includeReviews,
@@ -787,19 +707,14 @@ hasMore=true bedeutet, dass weitere Ergebnisseiten vorhanden sind.
       server.registerTool(
         "get_hrr_article",
         {
-          description: `
-Ruft einen einzelnen HRR-Strafrecht-Beitrag aus einem Suchtreffer ab.
-Akzeptiert die vollständige HRR-URL oder den relativen Pfad.
-Bei truncated=true ist der Text unvollständig.
-          `.trim(),
-
+          description:
+            "Ruft einen einzelnen HRR-Beitrag ab. Bei truncated=true ist der Text unvollständig.",
           inputSchema:
             z.object({
               url:
                 z.string()
                   .min(5)
                   .max(2000),
-
               maxCharacters:
                 z.number()
                   .int()
@@ -807,14 +722,12 @@ Bei truncated=true ist der Text unvollständig.
                   .max(60000)
                   .default(20000),
             }),
-
           annotations: {
             readOnlyHint: true,
             idempotentHint: true,
             openWorldHint: true,
           },
         },
-
         async ({
           url,
           maxCharacters,
@@ -841,18 +754,15 @@ Bei truncated=true ist der Text unvollständig.
         "health_bverfg",
         {
           description:
-            "Prüft, ob der bestehende BVerfG-Deno-Proxy erreichbar ist.",
-
+            "Prüft, ob der BVerfG-Deno-Proxy erreichbar ist.",
           inputSchema:
             z.object({}),
-
           annotations: {
             readOnlyHint: true,
             idempotentHint: true,
             openWorldHint: true,
           },
         },
-
         async () => {
           try {
             return toolResult(
@@ -871,36 +781,24 @@ Bei truncated=true ist der Text unvollständig.
       server.registerTool(
         "search_bverfg_decisions",
         {
-          description: `
-Sucht Entscheidungen des Bundesverfassungsgerichts.
-
-Mindestens query oder aktenzeichen muss befüllt sein.
-resultsCount ist keine zugesicherte Gesamttrefferzahl.
-hasMore=true bedeutet, dass weitere ungesichtete Suchseiten vorhanden sind.
-
-Für tragende Aussagen soll ein Treffer anschließend mit
-get_bverfg_decision im Volltext abgerufen werden.
-          `.trim(),
-
+          description:
+            "Sucht BVerfG-Entscheidungen. Relevante Treffer anschließend im Volltext abrufen.",
           inputSchema:
             z.object({
               query:
                 z.string()
                   .max(500)
                   .optional(),
-
               aktenzeichen:
                 z.string()
                   .max(200)
                   .optional(),
-
               maxPages:
                 z.number()
                   .int()
                   .min(1)
                   .max(5)
                   .default(1),
-
               fromDate:
                 z.string()
                   .regex(
@@ -908,7 +806,6 @@ get_bverfg_decision im Volltext abgerufen werden.
                     "Erwartet YYYY-MM-DD",
                   )
                   .optional(),
-
               toDate:
                 z.string()
                   .regex(
@@ -928,14 +825,12 @@ get_bverfg_decision im Volltext abgerufen werden.
                     "Mindestens query oder aktenzeichen muss befüllt sein.",
                 },
               ),
-
           annotations: {
             readOnlyHint: true,
             idempotentHint: true,
             openWorldHint: true,
           },
         },
-
         async ({
           query,
           aktenzeichen,
@@ -967,21 +862,14 @@ get_bverfg_decision im Volltext abgerufen werden.
       server.registerTool(
         "get_bverfg_decision",
         {
-          description: `
-Ruft eine konkrete BVerfG-Entscheidung anhand der tatsächlich
-von search_bverfg_decisions gelieferten URL ab.
-
-Die Treffer-URL soll unverändert übernommen werden.
-Bei truncated=true ist der Text unvollständig.
-          `.trim(),
-
+          description:
+            "Ruft eine konkrete BVerfG-Entscheidung anhand der URL aus einem Suchtreffer ab.",
           inputSchema:
             z.object({
               url:
                 z.string()
                   .min(5)
                   .max(3000),
-
               maxCharacters:
                 z.number()
                   .int()
@@ -989,14 +877,12 @@ Bei truncated=true ist der Text unvollständig.
                   .max(80000)
                   .default(30000),
             }),
-
           annotations: {
             readOnlyHint: true,
             idempotentHint: true,
             openWorldHint: true,
           },
         },
-
         async ({
           url,
           maxCharacters,
@@ -1023,18 +909,15 @@ Bei truncated=true ist der Text unvollständig.
         "health_burhoff",
         {
           description:
-            "Prüft, ob der bestehende Burhoff-Deno-Proxy erreichbar ist.",
-
+            "Prüft, ob der Burhoff-Rechtsprechungsproxy erreichbar ist.",
           inputSchema:
             z.object({}),
-
           annotations: {
             readOnlyHint: true,
             idempotentHint: true,
             openWorldHint: true,
           },
         },
-
         async () => {
           try {
             return toolResult(
@@ -1053,31 +936,17 @@ Bei truncated=true ist der Text unvollständig.
       server.registerTool(
         "search_burhoff_decisions",
         {
-          description: `
-Durchsucht Burhoff-Rechtsprechungsindexseiten.
-
-Quellenbereiche sind weitere, rvg, leitsaetze oder all.
-Mehrere Bereiche können kommasepariert angegeben werden.
-
-Burhoff ist eine private Recherchequelle.
-Treffer dienen dem Auffinden einschlägiger Entscheidungen.
-Tragende Rechtsaussagen sind möglichst anhand einer amtlichen
-oder anderweitig verifizierten Primärquelle gegenzuprüfen.
-
-includeFullText=true öffnet Treffer zusätzlich und ist langsamer.
-          `.trim(),
-
+          description:
+            "Durchsucht Burhoff-Rechtsprechungsindexseiten. Burhoff ist eine private Recherchequelle.",
           inputSchema:
             z.object({
               query:
                 z.string()
                   .min(2)
                   .max(500),
-
               sources:
                 z.string()
                   .default("all"),
-
               mode:
                 z.enum([
                   "all",
@@ -1086,25 +955,21 @@ includeFullText=true öffnet Treffer zusätzlich und ist langsamer.
                   "literal",
                 ])
                   .default("all"),
-
               maxResults:
                 z.number()
                   .int()
                   .min(1)
                   .max(100)
                   .default(25),
-
               maxSourcePages:
                 z.number()
                   .int()
                   .min(1)
                   .max(80)
                   .default(35),
-
               includeFullText:
                 z.boolean()
                   .default(false),
-
               maxFullTextCharacters:
                 z.number()
                   .int()
@@ -1112,14 +977,12 @@ includeFullText=true öffnet Treffer zusätzlich und ist langsamer.
                   .max(30000)
                   .default(6000),
             }),
-
           annotations: {
             readOnlyHint: true,
             idempotentHint: true,
             openWorldHint: true,
           },
         },
-
         async ({
           query,
           sources,
@@ -1155,21 +1018,14 @@ includeFullText=true öffnet Treffer zusätzlich und ist langsamer.
       server.registerTool(
         "get_burhoff_document",
         {
-          description: `
-Ruft ein einzelnes Burhoff-Dokument anhand einer vollständigen
-Burhoff-URL oder eines relativen Pfads aus einem Suchtreffer ab.
-
-Bei truncated=true ist der Text unvollständig.
-Burhoff bleibt eine private Recherchequelle.
-          `.trim(),
-
+          description:
+            "Ruft ein einzelnes Burhoff-Dokument aus einem Suchtreffer ab.",
           inputSchema:
             z.object({
               url:
                 z.string()
                   .min(5)
                   .max(3000),
-
               maxCharacters:
                 z.number()
                   .int()
@@ -1177,14 +1033,12 @@ Burhoff bleibt eine private Recherchequelle.
                   .max(80000)
                   .default(30000),
             }),
-
           annotations: {
             readOnlyHint: true,
             idempotentHint: true,
             openWorldHint: true,
           },
         },
-
         async ({
           url,
           maxCharacters,
@@ -1212,17 +1066,14 @@ Burhoff bleibt eine private Recherchequelle.
         {
           description:
             "Prüft, ob der Burhoff online Blog direkt erreichbar ist.",
-
           inputSchema:
             z.object({}),
-
           annotations: {
             readOnlyHint: true,
             idempotentHint: true,
             openWorldHint: true,
           },
         },
-
         async () => {
           try {
             const html =
@@ -1232,13 +1083,10 @@ Burhoff bleibt eine private Recherchequelle.
 
             return toolResult({
               ok: true,
-
               service:
                 "Burhoff online Blog",
-
               source:
                 BURHOFF_BLOG_BASE,
-
               reachable:
                 html.length > 0,
             })
@@ -1252,34 +1100,20 @@ Burhoff bleibt eine private Recherchequelle.
       server.registerTool(
         "search_burhoff_blog",
         {
-          description: `
-Durchsucht den Burhoff online Blog über die öffentliche
-WordPress-Suchseite.
-
-Der Blog ist eine private fachliche Sekundärquelle.
-
-Treffer dienen insbesondere der Problemerschließung und dem
-Auffinden besprochener Gerichtsentscheidungen.
-
-Für tragende Aussagen soll ein relevanter Beitrag mit
-get_burhoff_blog_article geöffnet und die darin zitierte
-Primärquelle soweit möglich gesondert verifiziert werden.
-          `.trim(),
-
+          description:
+            "Durchsucht den Burhoff online Blog. Der Blog ist eine private Sekundärquelle.",
           inputSchema:
             z.object({
               query:
                 z.string()
                   .min(2)
                   .max(500),
-
               maxPages:
                 z.number()
                   .int()
                   .min(1)
                   .max(5)
                   .default(2),
-
               maxResults:
                 z.number()
                   .int()
@@ -1287,14 +1121,12 @@ Primärquelle soweit möglich gesondert verifiziert werden.
                   .max(50)
                   .default(20),
             }),
-
           annotations: {
             readOnlyHint: true,
             idempotentHint: true,
             openWorldHint: true,
           },
         },
-
         async ({
           query,
           maxPages,
@@ -1318,27 +1150,14 @@ Primärquelle soweit möglich gesondert verifiziert werden.
       server.registerTool(
         "get_burhoff_blog_article",
         {
-          description: `
-Ruft einen einzelnen Beitrag aus dem Burhoff online Blog ab.
-
-Akzeptiert eine vollständige URL von blog.burhoff.de oder einen
-relativen Pfad.
-
-Bei truncated=true ist der Beitrag wegen der Zeichenbegrenzung
-unvollständig.
-
-Der Blog ist eine Sekundärquelle.
-Zitierte Entscheidungen sind für tragende Rechtsaussagen
-möglichst anhand einer Primärquelle zu verifizieren.
-          `.trim(),
-
+          description:
+            "Ruft einen einzelnen Beitrag aus dem Burhoff online Blog ab.",
           inputSchema:
             z.object({
               url:
                 z.string()
                   .min(5)
                   .max(3000),
-
               maxCharacters:
                 z.number()
                   .int()
@@ -1346,14 +1165,12 @@ möglichst anhand einer Primärquelle zu verifizieren.
                   .max(60000)
                   .default(20000),
             }),
-
           annotations: {
             readOnlyHint: true,
             idempotentHint: true,
             openWorldHint: true,
           },
         },
-
         async ({
           url,
           maxCharacters,
