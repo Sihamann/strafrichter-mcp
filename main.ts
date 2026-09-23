@@ -256,8 +256,8 @@ async function searchBurhoffBlog(
   let hasMore = false
 
   for (
-    let page = 1
-    page <= maxPages
+    let page = 1;
+    page <= maxPages;
     page++
   ) {
     const url =
@@ -396,11 +396,16 @@ async function searchBurhoffBlog(
 
       results.push({
         title,
+
         url:
           articleUrl,
+
         date,
+
         author,
+
         categories,
+
         snippet,
 
         source:
@@ -637,7 +642,7 @@ const handler =
               "strafrichter-mcp",
 
             version:
-              "0.2.0",
+              "0.2.1",
           },
           {
             instructions: `
@@ -676,10 +681,6 @@ Alle Tools sind ausschließlich lesend.
         )
 
 
-      // ======================================================
-      // 1. HRR HEALTH
-      // ======================================================
-
       server.registerTool(
         "health_hrr_strafrecht",
         {
@@ -705,17 +706,11 @@ Alle Tools sind ausschließlich lesend.
               ),
             )
           } catch (error) {
-            return toolError(
-              error,
-            )
+            return toolError(error)
           }
         },
       )
 
-
-      // ======================================================
-      // 2. HRR SUCHE
-      // ======================================================
 
       server.registerTool(
         "search_hrr_articles",
@@ -724,12 +719,9 @@ Alle Tools sind ausschließlich lesend.
 Durchsucht das HRR-Strafrecht-Aufsatzarchiv.
 
 HRR-Strafrecht ist eine fachwissenschaftliche Sekundärquelle.
-
 totalFound bezeichnet die von HRR gemeldete Trefferzahl vor
 einem lokalen Rezensionenfilter.
-
 resultsCount zählt die tatsächlich gelieferten Treffer.
-
 hasMore=true bedeutet, dass weitere Ergebnisseiten vorhanden sind.
           `.trim(),
 
@@ -749,9 +741,7 @@ hasMore=true bedeutet, dass weitere Ergebnisseiten vorhanden sind.
                   "standard",
                   "exact",
                 ])
-                  .default(
-                    "standard",
-                  ),
+                  .default("standard"),
 
               maxPages:
                 z.number()
@@ -788,26 +778,18 @@ hasMore=true bedeutet, dass weitere Ergebnisseiten vorhanden sind.
               ),
             )
           } catch (error) {
-            return toolError(
-              error,
-            )
+            return toolError(error)
           }
         },
       )
 
-
-      // ======================================================
-      // 3. HRR ARTIKEL
-      // ======================================================
 
       server.registerTool(
         "get_hrr_article",
         {
           description: `
 Ruft einen einzelnen HRR-Strafrecht-Beitrag aus einem Suchtreffer ab.
-
 Akzeptiert die vollständige HRR-URL oder den relativen Pfad.
-
 Bei truncated=true ist der Text unvollständig.
           `.trim(),
 
@@ -849,17 +831,11 @@ Bei truncated=true ist der Text unvollständig.
               ),
             )
           } catch (error) {
-            return toolError(
-              error,
-            )
+            return toolError(error)
           }
         },
       )
 
-
-      // ======================================================
-      // 4. BVERFG HEALTH
-      // ======================================================
 
       server.registerTool(
         "health_bverfg",
@@ -886,17 +862,11 @@ Bei truncated=true ist der Text unvollständig.
               ),
             )
           } catch (error) {
-            return toolError(
-              error,
-            )
+            return toolError(error)
           }
         },
       )
 
-
-      // ======================================================
-      // 5. BVERFG SUCHE
-      // ======================================================
 
       server.registerTool(
         "search_bverfg_decisions",
@@ -905,11 +875,8 @@ Bei truncated=true ist der Text unvollständig.
 Sucht Entscheidungen des Bundesverfassungsgerichts.
 
 Mindestens query oder aktenzeichen muss befüllt sein.
-
 resultsCount ist keine zugesicherte Gesamttrefferzahl.
-
-hasMore=true bedeutet, dass weitere ungesichtete Suchseiten
-vorhanden sind.
+hasMore=true bedeutet, dass weitere ungesichtete Suchseiten vorhanden sind.
 
 Für tragende Aussagen soll ein Treffer anschließend mit
 get_bverfg_decision im Volltext abgerufen werden.
@@ -991,17 +958,11 @@ get_bverfg_decision im Volltext abgerufen werden.
               ),
             )
           } catch (error) {
-            return toolError(
-              error,
-            )
+            return toolError(error)
           }
         },
       )
 
-
-      // ======================================================
-      // 6. BVERFG ENTSCHEIDUNG
-      // ======================================================
 
       server.registerTool(
         "get_bverfg_decision",
@@ -1011,7 +972,6 @@ Ruft eine konkrete BVerfG-Entscheidung anhand der tatsächlich
 von search_bverfg_decisions gelieferten URL ab.
 
 Die Treffer-URL soll unverändert übernommen werden.
-
 Bei truncated=true ist der Text unvollständig.
           `.trim(),
 
@@ -1053,17 +1013,11 @@ Bei truncated=true ist der Text unvollständig.
               ),
             )
           } catch (error) {
-            return toolError(
-              error,
-            )
+            return toolError(error)
           }
         },
       )
 
-
-      // ======================================================
-      // 7. BURHOFF HEALTH
-      // ======================================================
 
       server.registerTool(
         "health_burhoff",
@@ -1090,17 +1044,11 @@ Bei truncated=true ist der Text unvollständig.
               ),
             )
           } catch (error) {
-            return toolError(
-              error,
-            )
+            return toolError(error)
           }
         },
       )
 
-
-      // ======================================================
-      // 8. BURHOFF RECHTSPRECHUNGSSUCHE
-      // ======================================================
 
       server.registerTool(
         "search_burhoff_decisions",
@@ -1108,15 +1056,11 @@ Bei truncated=true ist der Text unvollständig.
           description: `
 Durchsucht Burhoff-Rechtsprechungsindexseiten.
 
-Quellenbereiche:
-weitere, rvg, leitsaetze oder all.
-
+Quellenbereiche sind weitere, rvg, leitsaetze oder all.
 Mehrere Bereiche können kommasepariert angegeben werden.
 
 Burhoff ist eine private Recherchequelle.
-
 Treffer dienen dem Auffinden einschlägiger Entscheidungen.
-
 Tragende Rechtsaussagen sind möglichst anhand einer amtlichen
 oder anderweitig verifizierten Primärquelle gegenzuprüfen.
 
@@ -1132,9 +1076,7 @@ includeFullText=true öffnet Treffer zusätzlich und ist langsamer.
 
               sources:
                 z.string()
-                  .default(
-                    "all",
-                  ),
+                  .default("all"),
 
               mode:
                 z.enum([
@@ -1143,9 +1085,7 @@ includeFullText=true öffnet Treffer zusätzlich und ist langsamer.
                   "or",
                   "literal",
                 ])
-                  .default(
-                    "all",
-                  ),
+                  .default("all"),
 
               maxResults:
                 z.number()
@@ -1206,17 +1146,11 @@ includeFullText=true öffnet Treffer zusätzlich und ist langsamer.
               ),
             )
           } catch (error) {
-            return toolError(
-              error,
-            )
+            return toolError(error)
           }
         },
       )
 
-
-      // ======================================================
-      // 9. BURHOFF EINZELDOKUMENT
-      // ======================================================
 
       server.registerTool(
         "get_burhoff_document",
@@ -1226,7 +1160,6 @@ Ruft ein einzelnes Burhoff-Dokument anhand einer vollständigen
 Burhoff-URL oder eines relativen Pfads aus einem Suchtreffer ab.
 
 Bei truncated=true ist der Text unvollständig.
-
 Burhoff bleibt eine private Recherchequelle.
           `.trim(),
 
@@ -1268,17 +1201,11 @@ Burhoff bleibt eine private Recherchequelle.
               ),
             )
           } catch (error) {
-            return toolError(
-              error,
-            )
+            return toolError(error)
           }
         },
       )
 
-
-      // ======================================================
-      // 10. BURHOFF BLOG HEALTH
-      // ======================================================
 
       server.registerTool(
         "health_burhoff_blog",
@@ -1316,17 +1243,11 @@ Burhoff bleibt eine private Recherchequelle.
                 html.length > 0,
             })
           } catch (error) {
-            return toolError(
-              error,
-            )
+            return toolError(error)
           }
         },
       )
 
-
-      // ======================================================
-      // 11. BURHOFF BLOG SUCHE
-      // ======================================================
 
       server.registerTool(
         "search_burhoff_blog",
@@ -1388,17 +1309,11 @@ Primärquelle soweit möglich gesondert verifiziert werden.
               ),
             )
           } catch (error) {
-            return toolError(
-              error,
-            )
+            return toolError(error)
           }
         },
       )
 
-
-      // ======================================================
-      // 12. BURHOFF BLOG BEITRAG
-      // ======================================================
 
       server.registerTool(
         "get_burhoff_blog_article",
@@ -1413,7 +1328,6 @@ Bei truncated=true ist der Beitrag wegen der Zeichenbegrenzung
 unvollständig.
 
 Der Blog ist eine Sekundärquelle.
-
 Zitierte Entscheidungen sind für tragende Rechtsaussagen
 möglichst anhand einer Primärquelle zu verifizieren.
           `.trim(),
@@ -1452,9 +1366,7 @@ möglichst anhand einer Primärquelle zu verifizieren.
               ),
             )
           } catch (error) {
-            return toolError(
-              error,
-            )
+            return toolError(error)
           }
         },
       )
